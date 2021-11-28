@@ -1,0 +1,194 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Oct 18 11:23:26 2021
+
+@author: VANDAL Abrina / LEFEVRE Mélanie 
+"""
+from math import pi, sin, cos, acos, atan, degrees, radians
+from skimage import io 
+from math import *
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+
+# importation et affichage de la carte 
+fichier = 'C:/Users/Abrina/OneDrive/Bureau/M3202/Fonddecarte.jpg'
+carte=plt.imread(fichier)
+#figure = plt.figure(figsize=(20,15))
+plt.imshow(carte)
+plt.title('Carte projection cylindrique équidistante : VANDAL Abrina LEFEVRE Mélanie')
+plt.xlabel('longitude')
+plt.ylabel('latitude')
+
+##########DEFINITION DES CONSTANTES######################
+l = 500 #On calcule le cap tous les 500km
+Q = pi / (1.852 * 60 * 180) 
+
+##########CALCULS######################################### 
+
+#conversion de la latitude lat pour qu'elle corresponde à l'echelle du graphique 
+def conversionlat(lat):
+    if lat > 0:
+        return 512-(lat*512)/90 #ces valeurs viennents des valeurs données par carte.shape
+    else:
+        return (-lat*512)/90+512   
+#conversion de la longitude long pour qu'elle corresponde à l'echelle du graphique 
+def conversionlong (long):
+    if long>0:
+        return (long*1024)/180 +1024 #ces valeurs viennents des valeurs données par carte.shape
+    else:
+        return 1024-(-long*1024/180)
+    #### point d'intersection de l'équateur et du méridien de greenwich a pour coordonnée 512/1024
+
+#tracer le point de longitude y et latitude x
+def placer (y,x):
+         plt.plot(conversionlong(y),conversionlat(x), marker=".", color="red")
+        
+# calcule la distance orthodromique entre un premier point de latitude latv1 et de longitude longv1 
+#et un deuxième point de latitude latv2 et de longitude longv2
+def distanceOrthodromique(latv1,longv1,latv2,longv2):
+    rayon=6371
+    A = radians(float(latv1))
+    C = radians(float(latv2))
+    E = radians(longv1-longv2)
+    d=((sin(A)*sin(C))+(cos(A)*cos(C)*cos(E)))
+    return np.arccos(d)*rayon
+#indique si on se déplace à l'ouest ou à l'est en fonction des coordonnées de deux points
+def choixDirection(latv1,longv1,latv2, longv2) :
+    if latv1 == latv2 and longv1 == longv2:
+        print("C'EST LE MEME POINT")
+    else: 
+        if abs(longv1)+ abs(longv2) < 180:
+            if longv1 < longv2:
+                print("ON PARS VERS L'EST")
+                CHOIXDIRECTION = 1
+            else :
+                print("ON PAR VERS L'OUEST")
+                CHOIXDIRECTION = 2
+        else:
+            if longv1 > longv2:
+                print("ON PARS VERS L'EST")
+                CHOIXDIRECTION = 1
+            else :
+                print("ON PAR VERS L'OUEST")
+                CHOIXDIRECTION = 2      
+    return CHOIXDIRECTION
+    
+##On avance en ligne droite de l km avec un cap alpha. On arrivera a un nouveau point M'
+# calcule la nouvelle latitude
+def latitudeNouveauPoint(lata, ALPHA) :
+    latmp = radians(lata) + cos(ALPHA) * l * Q
+    return degrees(latmp)
+
+#calcule la nouvelle longitude 
+def longitudeNouveauPoint(latm, longm, ALPHAb):   
+    lonmp = radians(longm) + (sin(ALPHAb)/cos(radians(latm))) * l * Q
+    return degrees(lonmp)
+
+# calcule le cap initial à suivre 
+def capInitial(latv1, longv1, latv2, longv2, direction):
+    latitude1 = radians(float(latv1))
+    latitude2 = radians(float(latv2))
+    difflongitude = radians(float(abs(longv1-longv2)))
+    expr = (sin(latitude1)* sin(latitude2)) + (cos(latitude1)* cos(latitude2) * cos(difflongitude))
+    B = np.arccos(expr)
+    V =(sin(latitude2) - sin(latitude1) * cos(B)) / (cos(latitude1) * sin(B))
+    if direction == 1:
+        alpha = np.arccos(V) #On se déplace vers l'est 
+    else:
+        alpha = 2 * pi - np.arccos(V) #On se déplace vers l'ouest
+    return alpha
+ 
+#Trace la route orthodromique 
+def tracerroute(lat0,long0,latA,longA):
+    direction = choixDirection(lat0, long0, latA, longA) #pour savoir si on va à l'est ou à l'ouest
+    o= distanceOrthodromique(lat0,long0,latA,longA)
+    cpt=1
+    if abs(long0) + abs(longA) < 180:
+        if(long0!=longA):
+            while cpt < o/l :
+                cI = capInitial(lat0,long0, latA, longA, direction)
+                polat = lat0
+                polong= long0
+                lat0 =latitudeNouveauPoint(polat, cI)
+                long0=longitudeNouveauPoint(polat, polong, cI)
+                cpt+=1
+                plt.plot([conversionlong(long0),conversionlong(polong)],[conversionlat(lat0),conversionlat(polat)],'c-')
+            cI = capInitial(lat0,long0, latA, longA, direction)
+            polat = lat0
+            polong= long0
+            lat0 =latitudeNouveauPoint(polat, cI)
+            long0=longitudeNouveauPoint(polat, polong, cI)
+            plt.plot([conversionlong(long0),conversionlong(polong)],[conversionlat(lat0),conversionlat(polat)],'c-')
+        else:
+            plt.plot([conversionlong(longA),conversionlong(long0)],[conversionlat(latA),conversionlat(lat0)],'c-')
+    else :
+        while cpt < o/l :
+                cI = capInitial(lat0,long0, latA, longA, direction)
+                polat = lat0
+                polong= long0
+                lat0 =latitudeNouveauPoint(polat, cI)
+                long0=longitudeNouveauPoint(polat, polong, cI)
+                if long0 > longA:
+                    if long0 >= 180:
+                        long0 = -180
+                        polong = long0
+                        long0 = longitudeNouveauPoint(polat, polong, cI)
+                else:
+                    if long0 <=-180 :
+                        long0 = 180             
+                        polong = long0
+                        long0 = longitudeNouveauPoint(polat, polong, cI)
+                cpt+=1
+                plt.plot([conversionlong(long0),conversionlong(polong)],[conversionlat(lat0),conversionlat(polat)],'c-')
+
+                
+##############################  SAISIES DES DONNÉES ######################################### 
+print("ENTREZ LES COORDONNÉES DES POINTS DE DÉPART "
+      "ET D'ARRIVÉE EN DEGRÉS DÉCIMAUX\n")
+
+print("**********Ville DEPART**********\n ")
+
+la1= float(input("Entrez la latitude de la première ville: \n" ))
+if la1 < -90 or la1 > 90:
+    print("Latitude " +str(la1) + " de la première est ville invalide \n")
+    la1 = la1 %90
+    print("Nouvelle latitude \n" + str(la1))
+    
+
+lon1= float(input("Entrez la longitude de la première ville :\n"))
+if lon1 < -180 or lon1 > 180:
+    print("Longitude " +str(lon1) + " de la première est ville invalide \n ")
+    lon1 = lon1 %180
+    print("Nouvelle longitude \n " + str(lon1))
+    
+    
+print ("**********Ville ARRIVEE********** \n ")
+
+
+la2 = float(input("Entrez la latitude de la deuxième ville:\n" ))
+if la2 < -90 or la2 > 90:
+    print("Latitude " +str(la2) + " de la deuxième est ville invalide \n")
+    la2 = la2 %90
+    print("Nouvelle latitude \n" + str(la2))
+    
+
+lon2 = float(input("Entrez la longitude de la deuxième ville:\n" ))
+
+if lon2 < -180 or lon2 > 180:
+    print("Longitude " +str(lon2) + " de la deuxième est ville invalide \n ")
+    lon2 = lon2 %180
+    print("Nouvelle longitude \n" + str(lon2))
+    
+##############################  AFFICHAGE DES RESULTATS ##################################### 
+#Afficher les informations sur la distance orthodromique 
+print("\nLa distance orthodromique entre ces deux villes est : \n" + str(distanceOrthodromique(la1,lon1,la2,lon2)) + " km")
+
+
+#Pour placer les deux points 
+print(placer(lon1,la1))
+print(placer(lon2,la2))
+tracerroute(la1, lon1, la2, lon2)
+plt.plot([conversionlong(lon2),conversionlong(lon1)],[conversionlat(la2),conversionlat(la1)],'r--')
+plt.show()
